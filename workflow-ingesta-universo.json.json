@@ -1,0 +1,221 @@
+{
+  "name": "Ingreso Universo",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "dbf96313-f19c-471c-9786-db4b7b6cf9c2",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/Base_de_Conocimiento_del_Universo.pdf\" } },\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/FAQ_Universo.pdf\" } },\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/Guia_Sistema_Solar.pdf\" } },\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/Guia_Exploracion_Espacial.pdf\" } },\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/Glosario_Astronomico.pdf\" } },\n  { json: { url: \"https://raw.githubusercontent.com/Ariiiiii22/UNIVERSO_AGN/main/Curiosidades_del_Universo.pdf\" } }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "63a58602-06c8-47b8-90f8-3f94eead73f7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        448,
+        0
+      ],
+      "id": "4f79afb6-bf62-4884-9757-1b2fa9ab8b44",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "id": "277df01e-ca95-46dd-85fb-d722e3747c04",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "value": "=universo_vector_store",
+          "mode": "id"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        928,
+        0
+      ],
+      "id": "0b1acca7-4cca-4f8a-8436-b016e16b29da",
+      "name": "Simple Vector Store"
+    },
+    {
+      "parameters": {
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1024,
+        224
+      ],
+      "id": "7e587177-7e3d-47e0-856c-9c4cf4374d71",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        512
+      ],
+      "id": "213d8a21-4c36-4aed-ad41-aa0bc979b6a2",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "modelName": "embed-multilingual-v3.0"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsCohere",
+      "typeVersion": 1,
+      "position": [
+        896,
+        224
+      ],
+      "id": "b54fd9aa-a636-4d46-83f4-f149e2d3fc86",
+      "name": "Embeddings Cohere",
+      "credentials": {
+        "cohereApi": {
+          "id": "eFcgctOBpjTalfQN",
+          "name": "Cohere account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings Cohere": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6332dda4-4ad0-45a6-bf2f-b34b862bc022",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "952bbdfedc93ccd65b0c94cb85e2f76e664228111c2b534c57fc9cfd00c02d52"
+  },
+  "nodeGroups": [],
+  "id": "fVl0SFv7KkZPR9S0",
+  "tags": []
+}
