@@ -1,49 +1,62 @@
-# Universo IA 🌌
+# Universo AGN 🌌
 
-Agente inteligente que responde preguntas sobre astronomía y el universo, basado en documentación propia.
+Agente inteligente que responde preguntas sobre astronomía y el universo, basado en documentación propia (PDFs), integrado con el bot de Telegram y desplegado usando servicios de Oracle Cloud Infrastructure (OCI).
 
 ## 📌 Descripción del proyecto
 
-Universo Ang es un agente conversacional creado como parte del Challenge de Alura/Oracle sobre construcción de agentes inteligentes. El agente utiliza una base documental propia sobre el universo (Big Bang, Sistema Solar, agujeros negros, exploración espacial, glosario astronómico y curiosidades), citando la información contenida en los documentos en lugar de inventar respuestas.
+El agente utiliza una base documental propia sobre el universo (Big Bang, Sistema Solar, agujeros negros, exploración espacial, glosario astronómico y curiosidades) para responder preguntas de los usuarios a través de Telegram, citando la información contenida en los documentos en lugar de inventar respuestas.
 
 ## 🏗️ Arquitectura de la solución
 
-El flujo general del agente es el siguiente:
+El proyecto está compuesto por **dos workflows independientes** en n8n, que se comunican a través de un almacén de vectores compartido (`universo_vector_store`), y por **OCI Object Storage** como fuente de los documentos originales.
 
 ```
-Usuario
-   │
-   ▼
-Pregunta (chat / webhook)
-   │
-   ▼
-   n8n  ──────────────► Cohere (embeddings + LLM)
-   │                         │
-   ▼                         │
-Base documental (PDFs)◄──────┘
-   │
-   ▼
-Respuesta final al usuario
+                  OCI Object Storage
+          (bucket: universo-agn-documentos)
+                           │
+                           ▼
+        ┌─────────────────────────────────────┐
+        │     WORKFLOW 1: Ingesta-Universo    │
+        │  (se ejecuta manualmente una vez    │
+        │   o cada vez que cambian los docs)  │
+        │                                     │
+        │  Descarga PDFs → Extrae texto →     │
+        │  Divide en fragmentos → Genera      │
+        │  embeddings con Cohere → Guarda     │
+        └──────────────────┬──────────────────┘
+                           │
+                           ▼
+                 universo_vector_store
+                  (memoria compartida)
+                           ▲
+                           │
+        ┌──────────────────┴────────────────────┐
+        │   WORKFLOW 2: Challenge Universo      │
+        │      (activo, escucha Telegram)       │
+        │                                       │
+        │  Usuario pregunta en Telegram →       │
+        │  AI Agent busca en el vector store →  │
+        │  Cohere genera la respuesta →         │
+        │  Se responde al usuario en Telegram   │
+        └───────────────────────────────────────┘
 ```
 
-1. Los documentos PDF se procesan y dividen en fragmentos.
-2. Cada fragmento se convierte en un embedding mediante Cohere.
-3. Cuando el usuario hace una pregunta, el flujo de n8n busca el fragmento más relevante.
-4. Ese fragmento se envía a Cohere junto con la pregunta para generar la respuesta final.
-5. La aplicación está desplegada en la nube (OCI) para estar disponible públicamente.
+- `Ingesta-Universo` se encarga de leer los documentos fuente y convertirlos en información consultable (embeddings). Solo necesita ejecutarse cuando se agregan o modifican documentos.
+- `Challenge Universo` es el que queda activo, escuchando mensajes de Telegram y respondiendo en tiempo real usando la información ya cargada.
 
 ## 🛠️ Tecnologías y herramientas utilizadas
 
-- **n8n** – orquestación del flujo del agente (recepción de preguntas, búsqueda de información, generación de respuestas).
-- **Cohere** – modelo de lenguaje utilizado para generar embeddings y respuestas.
-- **OCI (Oracle Cloud Infrastructure)** – despliegue de la aplicación en la nube.
+- **n8n** – orquestación de ambos flujos (ingesta de documentos y agente conversacional).
+- **Cohere** – modelo de lenguaje utilizado para generar embeddings y las respuestas del agente.
+- **Telegram Bot API** – interfaz conversacional para el usuario final.
+- **OCI Object Storage** – almacenamiento en la nube de los documentos PDF fuente, con acceso mediante Pre-Authenticated Requests (PAR).
 - **GitHub** – control de versiones y entrega del proyecto.
 - **PDF** – formato de la base documental utilizada como fuente de información.
 
-## 📄 Documentación utilizada (carpeta `documentos/`)
+## 📄 Documentación utilizada (PDFs en la raíz del repositorio)
 
 | Archivo | Contenido |
-|---|---|
+|---------|-----------|
 | `Base_de_Conocimiento_del_Universo.pdf` | Documento principal: origen del universo, galaxias, estrellas, agujeros negros, exploración espacial, entre otros. |
 | `FAQ_Universo.pdf` | Preguntas frecuentes sobre astronomía. |
 | `Guia_Sistema_Solar.pdf` | Información detallada del Sol, los 8 planetas y otros cuerpos del Sistema Solar. |
@@ -51,38 +64,55 @@ Respuesta final al usuario
 | `Glosario_Astronomico.pdf` | Definiciones de términos astronómicos clave. |
 | `Curiosidades_del_Universo.pdf` | Datos curiosos sobre el universo. |
 
-## ▶️ Cómo ejecutar el proyecto
+Estos mismos documentos están alojados en **OCI Object Storage** (bucket `universo-agn-documentos`), desde donde el flujo de ingesta los descarga usando URLs de acceso pre-autenticado (PAR). Ver evidencia en `screenshots/oci.jpg`.
 
-1. Clonar este repositorio.
-2. Importar el archivo `workflow-universo.json` en una instancia de n8n (local o en la nube).
-3. Configurar las credenciales de Cohere dentro de n8n (API key propia, no incluida en este repositorio).
-4. Cargar los documentos de la carpeta `documentos/` en el nodo correspondiente del flujo.
-5. Activar el flujo (webhook) y realizar preguntas al agente a través del chat o del endpoint generado.
+## 💻 Código fuente (lectura y procesamiento de documentos)
+
+- **`workflow-ingesta-universo.json`** — contiene la lógica completa de lectura: descarga los PDFs desde OCI Object Storage, extrae su texto, lo divide en fragmentos y genera los embeddings con Cohere.
+- **`workflow-agente-universo.json`** — contiene la lógica del agente conversacional: recibe preguntas por Telegram, busca en el vector store y genera la respuesta.
+
+Evidencia visual de ambos flujos ejecutándose correctamente: `screenshots/n8n-ingesta.jpg` y `screenshots/n8n-agente.jpg`.
+
+## 🤖 Prueba el agente ahora mismo
+
+El agente ya está **desplegado y activo**. Puedes hablarle directamente en Telegram, sin instalar ni configurar nada:
+
+- **Bot:** [@universoagente_bot](https://t.me/universoagente_bot)
+- **Cómo usarlo:** abre el link, presiona "Start" (o envía `/start`), y escríbele cualquier pregunta sobre astronomía o el universo.
+
+## ▶️ Cómo ejecutar el proyecto localmente (opcional)
+
+Si quieres replicar el proyecto desde cero:
+
+1. Clonar este repositorio
+2. Importar `workflow-ingesta-universo.json` y `workflow-agente-universo.json` en una instancia de n8n.
+3. Configurar las credenciales necesarias dentro de n8n:
+   - API key de Cohere.
+   - Token de un bot de Telegram propio (creado con @BotFather).
+4. En el nodo "Simple Vector Store" de ambos workflows, verificar que el **Memory Key** sea el mismo (`universo_vector_store`) para que compartan la misma información.
+5. Ejecutar primero `Ingesta-Universo` para cargar los documentos en el vector store.
+6. Activar `Challenge Universo` para que el bot quede escuchando mensajes de Telegram de forma continua.
+7. Escribirle al bot en Telegram para probarlo.
+
 
 ## 💬 Ejemplos de preguntas que el agente puede responder
 
+- ¿Cómo inició el universo?
 - ¿Qué es un agujero negro?
+- ¿Me puedes hablar sobre Mercurio?
+- ¿Me puedes hablar sobre Saturno?
+- ¿Qué es una nebulosa?
 - ¿Cuántos planetas tiene el Sistema Solar?
-- ¿Qué es la materia oscura?
-- ¿Qué descubrió el telescopio James Webb?
-- ¿Cuál es el planeta más grande?
-- ¿Qué diferencia hay entre un meteoro y un meteorito?
 
-## 🤖 Ejemplos de respuestas generadas por el agente
+Capturas de estas conversaciones reales disponibles en `screenshots/universo-agente.jpg` y `screenshots/universo-agente2.jpg`.
 
-> **Pregunta:** ¿Qué es un agujero negro?
-> **Respuesta:** Un agujero negro es una región del espacio-tiempo con una gravedad tan intensa que ni siquiera la luz puede escapar de ella una vez que cruza el horizonte de eventos. Se forma generalmente tras el colapso de una estrella masiva.
+## ☁️ Despliegue y evidencia de uso de OCI
 
-> **Pregunta:** ¿Cuál es el planeta más grande del Sistema Solar?
-> **Respuesta:** Júpiter es el planeta más grande del Sistema Solar, con un diámetro 11 veces mayor que el de la Tierra.
+El agente está desplegado y accesible públicamente en Telegram: **[@universoagente_bot](https://t.me/universoagente_bot)**.
 
-*(Estas respuestas se actualizarán con capturas reales una vez que el agente esté desplegado y en funcionamiento).*
+Como parte del proceso de despliegue, este proyecto integra **OCI Object Storage** del ecosistema de Oracle Cloud Infrastructure:
 
-## ☁️ Despliegue
-
-- **URL pública:** _(pendiente — se agregará al desplegar en OCI)_
-- **Evidencia visual:** ver carpeta `screenshots/`
-
-## 👤 Autor
-
-Proyecto desarrollado como parte del Challenge de Agentes Inteligentes (Alura / Oracle Next Education).
+- Se creó un bucket llamado `universo-agn-documentos` en OCI Object Storage (región Mexico Central - Querétaro).
+- Los 6 documentos PDF fuente se alojan ahí.
+- Se generaron **Pre-Authenticated Requests (PAR)** por cada archivo, permitiendo que el flujo de ingesta de n8n los descargue de forma segura sin exponer el bucket completo como público.
+- El agente conversacional (n8n) está activo y responde en tiempo real a través de Telegram, usando la información indexada desde estos documentos alojados en OCI.
